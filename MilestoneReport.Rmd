@@ -1,0 +1,89 @@
+---
+title: "Milestone Report for JHU Data Science Capstone"
+author: "Amos Ang"
+date: "29 March 2015"
+output: 
+    html_document:
+        theme: cerulean
+---
+
+```{r, include=F}
+# Load libraries and perform other overheads. Everything (messages, output, etc) is suppressed.
+library("stylo")
+library("tm")
+library("data.table")
+library("ggplot2")
+library("dplyr")
+
+source("R/functions.R")  # Utility functions here.
+
+vc_sample_filenames <- generate_Samples(percent = 0.2)  # Generate sub-samples from the given sample files. File paths to all 3 sub-sample files are returned.
+
+dt_ft_1g <- get_FreqTable_FromFiles(vc_sample_filenames, ngram = 1)
+dt_ft_2g <- get_FreqTable_FromFiles(vc_sample_filenames, ngram = 2)
+dt_ft_3g <- get_FreqTable_FromFiles(vc_sample_filenames, ngram = 3)
+
+```
+
+### Executive Summary
+This milestone report serves as a progress update on the status of the capstone project. The report provides some summary statistics about the data sets, and highlights certain interesting observations in the data. Lastly, a tentative approach for the creation of the prediction model is proposed, to solicit feedback and suggestions.  
+
+### Summary Statistics about the Data Sets
+The following are the **line count** and **word count** for each of the original three files, as shown below.
+
+```{r cache=TRUE, warning=FALSE}
+stats_blogs   <- get_Filestats(fp_blogs_all)
+stats_news    <- get_Filestats(fp_news_all)
+stats_twitter <- get_Filestats(fp_twitter_all)
+stats_blogs
+stats_news   
+stats_twitter
+```
+
+> As an interesting aside, my 32-bit Win7 computer did not have sufficient memory to handle a critical function (txt.to.words()), which kept choking when fed with an entire file in get_Filestats(). A work-around was used, by splitting each file into 10 pieces, and passing one piece at a time to that function, to be tokenized into words, and then counted. The word counts for each piece were aggregated to give a total. This was how I managed to count the words, despite a lack of computer memory.  
+
+### Generate Frequency Tables for N-grams
+Next, we create frequency tables for 1-, 2-, 3-, and 4-grams (collectively known as *n-grams*, where n is the number of consecutive words). These tables will serve to illustrate the relative frequencies of the occurrence of each n-gram.  
+
+The idea here is to examine which words/n-grams are frequently used. This will be the basis for our prediction model, which will attempt to do subsequent word predictions based on the frequency which each word/n-gram appears in the supplied text files.  
+
+Note that due to limitations of time and computer memory, the frequencies tables were generated based on a 20% random sample of the original files. 20% of the number of lines of each original file is randomly selected, and written to an intermediate file. All 3 intermediate files are combined together to form the body of text (this is known as a *corpus*), from which the word/n-gram frequency tables are generated.
+
+```{r cache=T, fig.height = 6, fig.width = 8}
+plot_1g <- print_Barchart(head(dt_ft_1g, 10), title = "Top 10 1-grams by Frequency")
+plot_1g
+```
+
+```{r cache=T, fig.height = 6, fig.width = 8}
+plot_2g <- print_Barchart(head(dt_ft_2g, 10), title = "Top 10 2-grams by Frequency")
+plot_2g
+```
+
+```{r cache=T, fig.height = 6, fig.width = 8}
+plot_3g <- print_Barchart(head(dt_ft_3g, 10), title = "Top 10 3-grams by Frequency")
+plot_3g
+```
+
+### Interesting Findings About the Data Sets
+Here are some of the interesting observations I've made while exploring the data sets:
+
+1. **Exponential Decline in N-gram Usefulness**. Majority of the n-grams seem to have a frequency count of 1. The problem gets worse, as the n-gram size increases. I guess this kind of makes sense, because the longer a n-gram gets, the harder it is to have high frequencies of repetitions. 
+One implication is that frequency table entries with a frequency of 1 should be eliminated, because they are just noise.
+
+2. **Algorithms for dealing with large data sets are different**. Code which initially seemed rather simple, ended up being completely rewritten when the system ran out of memory. This serves as a good introduction to the real world big data problems out there. Remember to write code with scalability in mind right from the beginning, especially if you know upfront that the data volume will be huge!
+
+
+
+### Next Steps - Approach for Building Out the Prediction Algorithm
+In this section, I will outline my subsequent strategy for building out the prediction model. It is hoped that my fellow data scientists are able help out with some constructive feedback, suggestions, and tips! In point form, here is what I intend to do next:  
+
+1. **Generate 4-gram and perhaps 5-gram frequency tables**. I'm not really sure if so many n-gram tables are needed, and will need to explore their relative value (ie: marginal benefit vs marginal costs).
+
+2. **Reduce the number of entries in the frequency tables**. Many of the entries are noise, and are not very useful. But it is certain that the full frequency tables are way too large to be used as-is. One approach might be to remove all low-frequency entries, but determining an appropriate cut-off level will take some studying. More ideas for eliminating the noise would be welcome. 
+
+3. **Research on backoff strategies and how to apply**. In general, I know the prediction algorithm should do something as follows:
+
+- Convert the user input on the prediction app into an n-gram. Contractions and numbers should be removed, whitespace should be eliminated, and so on, just like how the raw text was originally cleaned, prior to generating the frequency tables.
+
+- Take the user input and look up the frequency tables. Supposing the user inputs 2 words, so the system should look-up the 3-gram frequency table. If there's an exact match on the first 2 words, output the entry with the highest frequency (ie: probability). Otherwise, "back-off" by reducing 1 word from the user input, and look-up the 2-gram frequency table instead. However, I get the feeling that this is a rather simplistic view, and there will probably be more challenges encountered further on. Any heads-up on such challenges would be much appreciated!
+
